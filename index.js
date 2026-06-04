@@ -14,12 +14,11 @@ const bot = mineflayer.createBot({
 
 bot.loadPlugin(pathfinder);
 
-// ---------------- OWNER FIXED ----------------
+// ---------------- OWNER ----------------
 const OWNER = "Swiftness_MC";
 
 // ---------------- STATE ----------------
 let active = false;
-let followInterval = null;
 
 // ---------------- LOAD COMMANDS ----------------
 const commands = new Map();
@@ -33,10 +32,7 @@ if (fs.existsSync("./commands")) {
 
 // ---------------- SPAWN ----------------
 bot.once("spawn", () => {
-    console.log("✅ HeroxBot Online");
-
-    const mcData = require("minecraft-data")(bot.version);
-    bot.pathfinder.setMovements(new Movements(bot, mcData));
+    console.log("✅ HeroxBot v1.21.4 Online");
 });
 
 // ---------------- CHAT HANDLER ----------------
@@ -46,49 +42,62 @@ bot.on("chat", (username, message) => {
     if (username === bot.username) return;
 
     const args = message.split(" ");
-    const cmd = args[0].replace("/", "");
+    const raw = args[0];
 
-    // 🔥 ACTIVATE BOT
-    if (cmd === "griend") {
+    // prefix check "."
+    if (!raw.startsWith(".")) return;
+
+    const cmd = raw.replace(".", "");
+
+    // ---------------- ACTIVATE BOT ----------------
+    if (cmd === "hero") {
         active = true;
-        bot.chat("🤖 HeroxBot ACTIVATED!");
+        bot.chat("🤖 HeroxBot ACTIVATED (v1.21.4)");
         return;
     }
 
-    // ❌ BLOCK IF NOT ACTIVE
+    // block if not active
     if (!active) return;
+
+    // ---------------- GOTO ----------------
+    if (cmd === "goto") {
+
+        const targetName = args[1];
+
+        const player = bot.players[targetName];
+
+        if (!player || !player.entity) {
+            bot.chat("❌ Player not found");
+            return;
+        }
+
+        bot.pathfinder.setGoal(
+            new goals.GoalFollow(player.entity, 1),
+            true
+        );
+
+        bot.chat(`📍 Going to ${targetName}`);
+        return;
+    }
 
     // ---------------- FOLLOW ----------------
     if (cmd === "follow") {
 
         const player = bot.players[OWNER];
 
-        if (!player || !player.entity) {
-            bot.chat("❌ Owner not found");
-            return;
-        }
+        if (!player || !player.entity) return;
 
-        clearInterval(followInterval);
+        bot.pathfinder.setGoal(
+            new goals.GoalFollow(player.entity, 2),
+            true
+        );
 
-        followInterval = setInterval(() => {
-            const target = bot.players[OWNER];
-
-            if (!target || !target.entity) return;
-
-            bot.pathfinder.setGoal(
-                new goals.GoalFollow(target.entity, 2),
-                true
-            );
-
-        }, 1000);
-
-        bot.chat("👣 Following Owner");
+        bot.chat("👣 Following owner");
         return;
     }
 
     // ---------------- STOP ----------------
     if (cmd === "stop") {
-        clearInterval(followInterval);
         bot.pathfinder.setGoal(null);
         bot.chat("🛑 Stopped");
         return;
@@ -110,7 +119,7 @@ bot.on("chat", (username, message) => {
             )
         );
 
-        bot.chat("🚶 Coming to Owner");
+        bot.chat("🚶 Coming");
         return;
     }
 
@@ -125,8 +134,7 @@ bot.on("chat", (username, message) => {
         }
 
         bot.chat(
-            items
-                .slice(0, 10)
+            items.slice(0, 10)
                 .map(i => `${i.name} x${i.count}`)
                 .join(", ")
         );
@@ -134,7 +142,7 @@ bot.on("chat", (username, message) => {
         return;
     }
 
-    // ---------------- COMMANDS FOLDER ----------------
+    // ---------------- CUSTOM COMMANDS ----------------
     if (commands.has(cmd)) {
         commands.get(cmd)(bot, username, args);
     }
@@ -144,10 +152,7 @@ bot.on("chat", (username, message) => {
 // ---------------- RECONNECT ----------------
 bot.on("end", () => {
     console.log("❌ Disconnected, restarting...");
-
-    setTimeout(() => {
-        process.exit(1);
-    }, 5000);
+    setTimeout(() => process.exit(1), 5000);
 });
 
 bot.on("error", console.log);
