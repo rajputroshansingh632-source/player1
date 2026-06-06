@@ -8,7 +8,7 @@ const autoEat = require("./utils/autoeat");
 const autoMLG = require("./utils/automlg");
 const autoPickup = require("./utils/autopickup");
 
-// ---------------- CRASH HANDLER (IMPORTANT) ----------------
+// ---------------- CRASH HANDLERS ----------------
 process.on("uncaughtException", console.log);
 process.on("unhandledRejection", console.log);
 
@@ -20,6 +20,13 @@ const bot = mineflayer.createBot({
     auth: "offline",
     version: false
 });
+
+// ---------------- DEBUG LOGS ----------------
+bot.on("error", (e) => console.log("ERROR:", e));
+bot.on("end", () => console.log("END EVENT TRIGGERED"));
+bot.on("kicked", (r) => console.log("KICKED:", r));
+bot.on("login", () => console.log("LOGIN SUCCESS"));
+bot.on("spawn", () => console.log("SPAWN SUCCESS"));
 
 // ---------------- PLUGINS ----------------
 bot.loadPlugin(pathfinder);
@@ -41,7 +48,7 @@ bot.once("spawn", () => {
 
     bot.pathfinder.setMovements(defaultMove);
 
-    // safe run (prevents crash if module fails)
+    // SAFE LOAD (prevents crash)
     try { autoEat(bot); } catch (e) { console.log("autoEat error", e); }
     try { autoMLG(bot); } catch (e) { console.log("autoMLG error", e); }
     try { autoPickup(bot); } catch (e) { console.log("autoPickup error", e); }
@@ -124,12 +131,6 @@ bot.on("entityHurt", (entity) => {
 
     bot.pvp.attack(attacker.entity);
 });
-
-// ---------------- LOGS (IMPORTANT DEBUG) ----------------
-bot.on("login", () => console.log("🔑 Login success"));
-bot.on("spawn", () => console.log("🌍 Spawn success"));
-bot.on("kicked", console.log);
-bot.on("error", console.log);
 
 // ---------------- RECONNECT ----------------
 bot.on("end", () => {
