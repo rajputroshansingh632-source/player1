@@ -5,6 +5,10 @@ const fs = require("fs");
 
 const { pathfinder, Movements, goals } = require("mineflayer-pathfinder");
 
+const autoEat = require("./utils/autoeat");
+const autoMLG = require("./utils/automlg");
+const autoPickup = require("./utils/autopickup");
+
 // ---------------- BOT ----------------
 const bot = mineflayer.createBot({
     host: process.env.HOST,
@@ -15,7 +19,7 @@ const bot = mineflayer.createBot({
 bot.loadPlugin(pathfinder);
 
 // ---------------- OWNER ----------------
-const OWNER = "Swiftness_MC";
+const OWNER = process.env.OWNER_NAME || "Swiftness_MC";
 
 // ---------------- STATE ----------------
 let active = false;
@@ -32,60 +36,61 @@ if (fs.existsSync("./commands")) {
 
 // ---------------- SPAWN ----------------
 bot.once("spawn", () => {
-    console.log("✅ HeroxBot v1.21.4 Online");
+
+    console.log(`✅ ${bot.username} Online`);
+
+    const mcData = require("minecraft-data")(bot.version);
+    const defaultMove = new Movements(bot, mcData);
+
+    bot.pathfinder.setMovements(defaultMove);
+
+    // Utilities
+    autoEat(bot);
+    autoMLG(bot);
+    autoPickup(bot);
+
+});
+
+// ---------------- ALERT ----------------
+bot.on("entityHurt", (entity) => {
+
+    if (entity !== bot.entity) return;
+
+    bot.chat("⚠️ Alert: Attack on my system failed.");
+
 });
 
 // ---------------- CHAT HANDLER ----------------
 bot.on("chat", (username, message) => {
 
-    if (username !== OWNER) return;
     if (username === bot.username) return;
+    if (username !== OWNER) return;
 
     const args = message.split(" ");
     const raw = args[0];
 
-    // prefix check "."
     if (!raw.startsWith(".")) return;
 
-    const cmd = raw.replace(".", "");
+    const cmd = raw.slice(1).toLowerCase();
 
-    // ---------------- ACTIVATE BOT ----------------
+    // Activate
     if (cmd === "hero") {
         active = true;
-        bot.chat("🤖 HeroxBot ACTIVATED (v1.21.4)");
+        bot.chat("🤖 HeroxBot Activated");
         return;
     }
 
-    // block if not active
     if (!active) return;
 
-    // ---------------- GOTO ----------------
-    if (cmd === "goto") {
-
-        const targetName = args[1];
-
-        const player = bot.players[targetName];
-
-        if (!player || !player.entity) {
-            bot.chat("❌ Player not found");
-            return;
-        }
-
-        bot.pathfinder.setGoal(
-            new goals.GoalFollow(player.entity, 1),
-            true
-        );
-
-        bot.chat(`📍 Going to ${targetName}`);
-        return;
-    }
-
-    // ---------------- FOLLOW ----------------
+    // Follow Owner
     if (cmd === "follow") {
 
         const player = bot.players[OWNER];
 
-        if (!player || !player.entity) return;
+        if (!player || !player.entity) {
+            bot.chat("❌ Owner not found");
+            return;
+        }
 
         bot.pathfinder.setGoal(
             new goals.GoalFollow(player.entity, 2),
@@ -96,19 +101,25 @@ bot.on("chat", (username, message) => {
         return;
     }
 
-    // ---------------- STOP ----------------
+    // Stop
     if (cmd === "stop") {
+
         bot.pathfinder.setGoal(null);
+        bot.clearControlStates();
+
         bot.chat("🛑 Stopped");
         return;
     }
 
-    // ---------------- COME ----------------
+    // Come
     if (cmd === "come") {
 
         const player = bot.players[OWNER];
 
-        if (!player || !player.entity) return;
+        if (!player || !player.entity) {
+            bot.chat("❌ Owner not found");
+            return;
+        }
 
         bot.pathfinder.setGoal(
             new goals.GoalNear(
@@ -123,18 +134,53 @@ bot.on("chat", (username, message) => {
         return;
     }
 
-    // ---------------- INVENTORY ----------------
+    // Goto Player
+    if (cmd === "goto" && args.length === 2) {
+
+        const player = bot.players[args[1]];
+
+        if (!player || !player.entity) {
+            bot.chat("❌ Player not found");
+            return;
+        }
+
+        bot.pathfinder.setGoal(
+            new goals.GoalFollow(player.entity, 1),
+            true
+        );
+
+        bot.chat(`📍 Going to ${args[1]}`);
+        return;
+    }
+
+    // Goto Coordinates
+    if (cmd === "goto" && args.length === 4) {
+
+        const x = parseInt(args[1]);
+        const y = parseInt(args[2]);
+        const z = parseInt(args[3]);
+
+        bot.pathfinder.setGoal(
+            new goals.GoalNear(x, y, z, 1)
+        );
+
+        bot.chat(`📍 Going to ${x} ${y} ${z}`);
+        return;
+    }
+
+    // Inventory
     if (cmd === "inventory") {
 
         const items = bot.inventory.items();
 
         if (!items.length) {
-            bot.chat("📦 Empty inventory");
+            bot.chat("📦 Inventory empty");
             return;
         }
 
         bot.chat(
-            items.slice(0, 10)
+            items
+                .slice(0, 10)
                 .map(i => `${i.name} x${i.count}`)
                 .join(", ")
         );
@@ -142,17 +188,21 @@ bot.on("chat", (username, message) => {
         return;
     }
 
-    // ---------------- CUSTOM COMMANDS ----------------
+    // Custom Commands
     if (commands.has(cmd)) {
-        commands.get(cmd)(bot, username, args);
+        try {
+            commands.get(cmd)(bot, username, args);
+        } catch (err) {
+            console.log(err);
+            bot.chat(`❌ Error in command ${cmd}`);
+        }
     }
 
 });
 
 // ---------------- RECONNECT ----------------
 bot.on("end", () => {
-    console.log("❌ Disconnected, restarting...");
-    setTimeout(() => process.exit(1), 5000);
+    console.log("❌ Disconnected");
 });
 
 bot.on("error", console.log);
