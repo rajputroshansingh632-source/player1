@@ -8,13 +8,20 @@ const autoEat = require("./utils/autoeat");
 const autoMLG = require("./utils/automlg");
 const autoPickup = require("./utils/autopickup");
 
+// ---------------- CRASH HANDLER (IMPORTANT) ----------------
+process.on("uncaughtException", console.log);
+process.on("unhandledRejection", console.log);
+
 // ---------------- BOT ----------------
 const bot = mineflayer.createBot({
     host: process.env.HOST,
     port: Number(process.env.PORT),
-    username: process.env.USERNAME
+    username: process.env.USERNAME,
+    auth: "offline",
+    version: false
 });
 
+// ---------------- PLUGINS ----------------
 bot.loadPlugin(pathfinder);
 bot.loadPlugin(pvp);
 
@@ -34,9 +41,10 @@ bot.once("spawn", () => {
 
     bot.pathfinder.setMovements(defaultMove);
 
-    autoEat(bot);
-    autoMLG(bot);
-    autoPickup(bot);
+    // safe run (prevents crash if module fails)
+    try { autoEat(bot); } catch (e) { console.log("autoEat error", e); }
+    try { autoMLG(bot); } catch (e) { console.log("autoMLG error", e); }
+    try { autoPickup(bot); } catch (e) { console.log("autoPickup error", e); }
 });
 
 // ---------------- CHAT COMMANDS ----------------
@@ -51,7 +59,6 @@ bot.on("chat", (username, message) => {
 
     const c = cmd.slice(1);
 
-    // activate
     if (c === "hero") {
         active = true;
         bot.chat("🤖 Activated");
@@ -60,7 +67,6 @@ bot.on("chat", (username, message) => {
 
     if (!active) return;
 
-    // stop
     if (c === "stop") {
         bot.pathfinder.setGoal(null);
         bot.pvp.stop();
@@ -69,7 +75,6 @@ bot.on("chat", (username, message) => {
         return;
     }
 
-    // follow owner
     if (c === "follow") {
         const p = bot.players[OWNER];
         if (!p?.entity) return;
@@ -82,7 +87,6 @@ bot.on("chat", (username, message) => {
         return;
     }
 
-    // come
     if (c === "come") {
         const p = bot.players[OWNER];
         if (!p?.entity) return;
@@ -121,10 +125,14 @@ bot.on("entityHurt", (entity) => {
     bot.pvp.attack(attacker.entity);
 });
 
+// ---------------- LOGS (IMPORTANT DEBUG) ----------------
+bot.on("login", () => console.log("🔑 Login success"));
+bot.on("spawn", () => console.log("🌍 Spawn success"));
+bot.on("kicked", console.log);
+bot.on("error", console.log);
+
 // ---------------- RECONNECT ----------------
 bot.on("end", () => {
     console.log("❌ Reconnecting...");
     setTimeout(() => process.exit(1), 5000);
 });
-
-bot.on("error", console.log);
